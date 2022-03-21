@@ -94,7 +94,10 @@ object VideoCompressor : CoroutineScope by MainScope() {
             job = launch {
 
                 val job = async { getMediaPath(context, uris[i]) }
-                val path = job.await()
+                var path = job.await()
+                if (path == ""){
+                    path = uris[i].toString()
+                }
 
                 val desFile = saveVideoFile(context, path, saveAt)
 
