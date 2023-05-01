@@ -7,8 +7,8 @@ import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import android.view.View
@@ -21,6 +21,8 @@ import com.abedelazizshe.lightcompressorlibrary.CompressionListener
 import com.abedelazizshe.lightcompressorlibrary.VideoCompressor
 import com.abedelazizshe.lightcompressorlibrary.VideoQuality
 import com.abedelazizshe.lightcompressorlibrary.config.Configuration
+import com.abedelazizshe.lightcompressorlibrary.config.SaveLocation
+import com.abedelazizshe.lightcompressorlibrary.config.SharedStorageConfiguration
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -39,6 +41,7 @@ class MainActivity : AppCompatActivity() {
     private val uris = mutableListOf<Uri>()
     private val data = mutableListOf<VideoDetailsModel>()
     private lateinit var adapter: RecyclerViewAdapter
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -122,22 +125,43 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setReadStoragePermission() {
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-
-            if (!ActivityCompat.shouldShowRequestPermissionRationale(
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
                     this,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-                )
+                    Manifest.permission.READ_MEDIA_VIDEO,
+                ) != PackageManager.PERMISSION_GRANTED
             ) {
-                ActivityCompat.requestPermissions(
+
+                if (!ActivityCompat.shouldShowRequestPermissionRationale(
+                        this,
+                        Manifest.permission.READ_MEDIA_VIDEO
+                    )
+                ) {
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.READ_MEDIA_VIDEO),
+                        1
+                    )
+                }
+            }
+        } else {
+            if (ContextCompat.checkSelfPermission(
                     this,
-                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                    1
-                )
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+
+                if (!ActivityCompat.shouldShowRequestPermissionRationale(
+                        this,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    )
+                ) {
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                        1
+                    )
+                }
             }
         }
     }
@@ -150,8 +174,18 @@ class MainActivity : AppCompatActivity() {
             VideoCompressor.start(
                 context = applicationContext,
                 uris,
-                isStreamable = true,
-                saveAt = Environment.DIRECTORY_MOVIES,
+                isStreamable = false,
+                sharedStorageConfiguration = SharedStorageConfiguration(
+                    saveAt = SaveLocation.movies,
+                    videoName = "compressed_video"
+                ),
+//                appSpecificStorageConfiguration = AppSpecificStorageConfiguration(
+//                    videoName = "compressed_video",
+//                ),
+                configureWith = Configuration(
+                    quality = VideoQuality.LOW,
+                    isMinBitrateCheckEnabled = true,
+                ),
                 listener = object : CompressionListener {
                     override fun onProgress(index: Int, percent: Float) {
                         //Update UI
@@ -194,10 +228,6 @@ class MainActivity : AppCompatActivity() {
                         // make UI changes, cleanup, etc
                     }
                 },
-                configureWith = Configuration(
-                    quality = VideoQuality.LOW,
-                    isMinBitrateCheckEnabled = true,
-                )
             )
         }
     }

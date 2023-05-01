@@ -14,18 +14,21 @@ I would like to mention that the set attributes for size and quality worked just
 
 **LightCompressor is now available in iOS**, have a look at [LightCompressor_iOS](https://github.com/AbedElazizShe/LightCompressor_iOS).
 
-# What's new in 1.1.1
+# Change Logs
 
-- **Breaking** srcPath is no longer allowed, only video uri is allowed.
-- **Breaking** You should pass a list of uris now.
-- **Breaking** You should pass the directory you wish to save the output videos in. e.g. saveAt: Environment.DIRECTORY_MOVIES.
-- **Breaking** No need to pass destPath or streamableFile anymore, only saveAt.
-- **Breaking** Passing context is required now.
-- It is possible to pass custom width and height or ask the library to keep the original height and width.
-- It is possible to compress multiple videos.
-- It is possible to pass isStreamable flag to ensure the video is prepared for streaming.
-- OnStart, OnSuccess, OnFailure, OnProgress, and OnCancelled return an index position for the video being compressed, this index matches the order of the urls list passed to the library.
-- OnSuccess returns the new size and the path of the video after compression.
+## What's new in 1.2.3
+
+- **Breaking** `StorageConfiguration` was removed.
+- **Breaking** `AppSpecificStorageConfiguration` can be passed to store the output video in Android's App Specific Storage.
+- **Breaking** `SharedStorageConfiguration` can be passed to store the output video in Android's Primary Storage, it accepts storing at `pictures`, `downloads`, or `movies`.
+- Only one of the configurations can be provided at a time, either `AppSpecificStorageConfiguration` or `SharedStorageConfiguration`.
+
+# What's new in 1.2.2
+
+- **Breaking** videoBitrate was renamed to videoBitrateInMbps. It should be int.
+- Updated README Usage section
+- Updated gradle and target android sdk to 33
+- Bugs fixes
 
 ## How it works
 When the video file is called to be compressed, the library checks if the user wants to set a min bitrate to avoid compressing low resolution videos. This becomes handy if you don’t want the video to be compressed every time it is to be processed to avoid having very bad quality after multiple rounds of compression. The minimum is;
@@ -61,7 +64,7 @@ when {
 }
 ```
 
-You can as well pass custom videoHeight, videoWidth, frameRate, and videoBitrate values if you don't want the library to auto-generate the values for you. **The compression will fail if height or width is specified without the other, so ensure you pass both values**.
+You can as well pass custom videoHeight, videoWidth, and videoBitrate values if you don't want the library to auto-generate the values for you. **The compression will fail if height or width is specified without the other, so ensure you pass both values**.
 
 These values were tested on a huge set of videos and worked fine and fast with them. They might be changed based on the project needs and expectations.
 
@@ -76,14 +79,32 @@ To use this library, you must add the following permission to allow read and wri
 
 ```xml
 <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-android:maxSdkVersion="28"/>
+<uses-permission
+    android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+    android:maxSdkVersion="28"
+    tools:ignore="ScopedStorage" />
 ```
 
 **API >= 29**
 
 ```xml
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+    android:maxSdkVersion="32"/>
+```
+
+**API >= 33**
+
+```xml
+ <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+```
+
+```kotlin
+
+ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+     // request READ_MEDIA_VIDEO run-time permission
+ } else {
+     // request WRITE_EXTERNAL_STORAGE run-time permission
+ }
 ```
 
 And import the following dependencies to use kotlin coroutines
@@ -95,7 +116,7 @@ implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${Version.coroutin
 implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:${Version.coroutines}"
 ```
 
-Then just call [VideoCompressor.start()] and pass context, uris, and saveAt directory name.
+Then just call [VideoCompressor.start()] and pass **context**, **uris**, **isStreamable**, **configureWith**, and either **sharedStorageConfiguration OR appSpecificStorageConfiguration**.
 
 The method has a callback for 5 functions;
 1) OnStart - called when compression started
@@ -109,6 +130,7 @@ The method has a callback for 5 functions;
 - All the callback functions returns an index for the video being compressed in the same order of the urls passed to the library. You can use this index to update the UI
 or retrieve information about the original uri/file.
 - The source video must be provided as a list of content uris.
+- OnSuccess returns the path of the stored video.
 - If you want an output video that is optimised to be streamed, ensure you pass [isStreamable] flag is true.
 
 ### Configuration values
@@ -117,9 +139,7 @@ or retrieve information about the original uri/file.
 
 - isMinBitrateCheckEnabled: this means, don't compress if bitrate is less than 2mbps
 
-- frameRate: any fps value
-
-- videoBitrate: any custom bitrate value
+- videoBitrateInMbps: any custom bitrate value in Mbps.
 
 - disableAudio: true/false to generate a video without audio. False by default.
 
@@ -129,6 +149,20 @@ or retrieve information about the original uri/file.
 
 - videoHeight: custom video height.
 
+### AppSpecificStorageConfiguration Configuration values
+
+- videoName: a custom name for the output video.
+
+- subFolderName: a subfolder name created in app's specific storage. The library won't create the subfolder and will throw an exception if the subfolder does not exist.
+
+
+### AppSpecificStorageConfiguration Configuration values
+
+- videoName: a custom name for the output video.
+
+- saveAt: the directory where the video should be saved in. Must be one of the following; [SaveLocation.pictures], [SaveLocation.movies], or [SaveLocation.downloads].
+
+
 To cancel the compression job, just call [VideoCompressor.cancel()]
 
 ### Kotlin
@@ -137,8 +171,26 @@ To cancel the compression job, just call [VideoCompressor.cancel()]
 VideoCompressor.start(
    context = applicationContext, // => This is required
    uris = List<Uri>, // => Source can be provided as content uris
-   isStreamable = true,
-   saveAt = Environment.DIRECTORY_MOVIES, // => the directory to save the compressed video(s)
+   isStreamable = false, 
+   // THIS STORAGE 
+   sharedStorageConfiguration = SharedStorageConfiguration(
+       saveAt = SaveLocation.movies, // => default is movies
+       videoName = "compressed_video" // => required name
+   ),
+   // OR AND NOT BOTH
+   appSpecificStorageConfiguration = AppSpecificStorageConfiguration(
+       videoName = "compressed_video", // => required name
+       subFolderName = "my-videos" // => optional and ONLY if exists
+   ),   
+   configureWith = Configuration(
+      quality = VideoQuality.MEDIUM,
+      isMinBitrateCheckEnabled = true,
+      videoBitrateInMbps = 5, /*Int, ignore, or null*/
+      disableAudio = false, /*Boolean, or ignore*/
+      keepOriginalResolution = false, /*Boolean, or ignore*/
+      videoWidth = 360.0, /*Double, ignore, or null*/
+      videoHeight = 480.0 /*Double, ignore, or null*/
+   ),
    listener = object : CompressionListener {
        override fun onProgress(index: Int, percent: Float) {
           // Update UI with progress value
@@ -162,67 +214,8 @@ VideoCompressor.start(
          // On Cancelled
        }
 
-   },
-   configureWith = Configuration(
-      quality = VideoQuality.MEDIUM,
-      frameRate = 24, /*Int, ignore, or null*/
-      isMinBitrateCheckEnabled = true,
-      videoBitrate = 3677198, /*Int, ignore, or null*/
-      disableAudio = false, /*Boolean, or ignore*/
-      keepOriginalResolution = false, /*Boolean, or ignore*/
-      videoWidth = 360.0, /*Double, ignore, or null*/
-      videoHeight = 480.0 /*Double, ignore, or null*/
-   )
+   }
 )
-```
-### Java
-
-```java
- VideoCompressor.start(
-    applicationContext, // => This is required
-    new ArrayList<Uri>(), // => Source can be provided as content uris
-    false, // => isStreamable
-    Environment.DIRECTORY_DOWNLOADS, // => the directory to save the compressed video(s)
-    new CompressionListener() {
-       @Override
-       public void onStart(int index, long size) {
-         // Compression start
-       }
-
-       @Override
-       public void onSuccess(int index, @Nullable String path) {
-         // On Compression success
-       }
-
-       @Override
-       public void onFailure(int index, String failureMessage) {
-         // On Failure
-       }
-
-       @Override
-       public void onProgress(int index, float progressPercent) {
-         // Update UI with progress value
-         runOnUiThread(new Runnable() {
-            public void run() {
-           }
-         });
-       }
-
-       @Override
-       public void onCancelled(int index) {
-         // On Cancelled
-       }
-    }, new Configuration(
-        VideoQuality.MEDIUM,
-        24, /*frameRate: int, or null*/
-        false, /*isMinBitrateCheckEnabled*/
-        null, /*videoBitrate: int, or null*/
-        false, /*disableAudio: Boolean, or null*/
-        false, /*keepOriginalResolution: Boolean, or null*/
-        360.0, /*videoWidth: Double, or null*/
-        480.0 /*videoHeight: Double, or null*/
-    )
-);
 ```
 
 ## Common issues
@@ -237,7 +230,7 @@ from within the main thread. Have a look at the example code above for more info
 To report an issue, please specify the following:
 - Device name
 - Android version
-- If the bug/issue exists on the sample app (version 1.1.1) of the library that could be downloaded at this [link](https://drive.google.com/file/d/112gWNotTBl-0tp_tvFTyaHxM8Y_UIPIV/view?usp=sharing).
+- If the bug/issue exists on the sample app (version 1.2.3) of the library that could be downloaded at this [link](https://drive.google.com/file/d/1WZtHN8gG2TaDuuTDKi9wB3B_sT_0SJ4w/view?usp=share_link).
 
 ## Compatibility
 Minimum Android SDK: LightCompressor requires a minimum API level of 21.
@@ -267,7 +260,7 @@ Include this in your Module-level build.gradle file:
 ### Groovy
 
 ```groovy
-implementation 'com.github.AbedElazizShe:LightCompressor:1.1.1'
+implementation 'com.github.AbedElazizShe:LightCompressor:1.2.3'
 ```
 
 If you're facing problems with the setup, edit settings.gradle by adding this at the beginning of the file:

@@ -67,7 +67,9 @@ object Compressor {
             )
         }
 
-        extractor.setDataSource(context, srcUri, null)
+        runCatching {
+            extractor.setDataSource(context, srcUri, null)
+        }
 
         val height: Double = prepareVideoHeight(mediaMetadataRetriever)
 
@@ -103,8 +105,8 @@ object Compressor {
 
         //Handle new bitrate value
         val newBitrate: Int =
-            if (configuration.videoBitrate == null) getBitrate(bitrate, configuration.quality)
-            else configuration.videoBitrate!!
+            if (configuration.videoBitrateInMbps == null) getBitrate(bitrate, configuration.quality)
+            else configuration.videoBitrateInMbps!! * 1000000
 
         //Handle new width and height values
         var (newWidth, newHeight) = if (configuration.videoHeight != null) Pair(
@@ -136,7 +138,6 @@ object Compressor {
             destination,
             newBitrate,
             streamableFile,
-            configuration.frameRate,
             configuration.disableAudio,
             extractor,
             listener,
@@ -153,7 +154,6 @@ object Compressor {
         destination: String,
         newBitrate: Int,
         streamableFile: String?,
-        frameRate: Int?,
         disableAudio: Boolean,
         extractor: MediaExtractor,
         compressionProgressListener: CompressionProgressListener,
@@ -190,7 +190,6 @@ object Compressor {
                     inputFormat,
                     outputFormat,
                     newBitrate,
-                    frameRate
                 )
 
                 val decoder: MediaCodec
