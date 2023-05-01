@@ -332,7 +332,7 @@ object VideoCompressor : CoroutineScope by MainScope() {
                 cursor.moveToFirst()
                 cursor.getString(columnIndex)
 
-            } else throw Exception()
+            } else ""
 
         } catch (e: Exception) {
             resolver.let {
